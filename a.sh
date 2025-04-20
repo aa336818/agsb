@@ -1,61 +1,63 @@
 #!/bin/bash
-set -e
 
-green() { echo -e "\033[32m\033[01m$1\033[0m"; }
-yellow() { echo -e "\033[33m\033[01m$1\033[0m"; }
-red() { echo -e "\033[31m\033[01m$1\033[0m"; }
+show_menu() {
+  clear
+  echo -e "\033[36m================ Sing-box 管理菜单 =================\033[0m"
+  echo -e "1. 安装 Sing-box + Cloudflare Tunnel"
+  echo -e "2. 卸载 Sing-box 与 Cloudflare Tunnel"
+  echo -e "3. 设置固定 Cloudflare 隧道配置"
+  echo -e "4. 设置节点配置（vmess + hy2）"
+  echo -e "0. 退出"
+  echo -e "\033[36m====================================================\033[0m"
+}
 
-[[ $EUID -ne 0 ]] && red "请以 root 用户运行本脚本。" && exit 1
+install_singbox() {
+  bash <(curl -Ls https://raw.githubusercontent.com/aa336818/a/main/a.sh)
+  read -p "按回车键返回菜单..."
+}
 
-green "[1/5] 开始安装依赖..."
-apt update && apt install -y curl wget tar jq socat
+uninstall_singbox() {
+  echo "🧹 正在卸载 sing-box 和 cloudflared..."
+  systemctl stop sing-box cloudflared
+  systemctl disable sing-box cloudflared
+  rm -rf /usr/local/bin/sing-box /usr/local/bin/cloudflared
+  rm -rf /etc/sing-box /root/.cloudflared
+  rm -f /etc/systemd/system/sing-box.service /etc/systemd/system/cloudflared.service
+  systemctl daemon-reload
+  echo "✅ 卸载完成"
+  read -p "按回车键返回菜单..."
+}
 
-green "[2/5] 检测系统架构..."
-ARCH=$(uname -m)
-case $ARCH in
-  x86_64) ARCH="amd64" ;;
-  aarch64) ARCH="arm64" ;;
-  *) red "不支持的架构: $ARCH" && exit 1 ;;
-esac
-green "系统架构为 $ARCH"
+set_fixed_tunnel() {
+  echo "🔧 设置固定隧道（请按提示填写）"
+  read -p "请输入你的 Tunnel ID: " tunnel_id
+  read -p "请输入你的 Hostname（如 bt.9191876.xyz）: " hostname
+  read -p "请输入你的凭证文件名（如 ${tunnel_id}.json）: " cred_file
 
-green "[3/5] 下载并安装 sing-box..."
-SBOX_VERSION=$(curl -s https://api.github.com/repos/SagerNet/sing-box/releases/latest | jq -r .tag_name)
-SBOX_VERSION_CLEAN=$(echo "$SBOX_VERSION" | sed 's/^v//')
-
-wget -O sing-box.tar.gz https://github.com/SagerNet/sing-box/releases/download/${SBOX_VERSION}/sing-box-${SBOX_VERSION_CLEAN}-linux-${ARCH}.tar.gz
-tar -xzf sing-box.tar.gz || { red "❌ 解压失败，下载可能不完整或版本号不匹配"; exit 1; }
-
-mkdir -p /etc/sing-box
-mv sing-box-${SBOX_VERSION_CLEAN}-linux-${ARCH}/* /etc/sing-box/
-ln -sf /etc/sing-box/sing-box /usr/local/bin/sing-box
-
-green "[4/5] 安装 Cloudflare Tunnel 工具..."
-wget -O /usr/local/bin/cloudflared https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-${ARCH}
-chmod +x /usr/local/bin/cloudflared
-
-green "[5/5] 生成配置模板..."
-
-mkdir -p /root/.cloudflared
-cat > /root/.cloudflared/config.yml <<EOF
-# Cloudflare Tunnel 配置文件模板
-# 请手动替换以下字段：
-# - tunnel: 你的 tunnel ID
-# - credentials-file: 凭证文件路径
-# - hostname: 你的绑定域名（如 bt.9191876.xyz）
-
-tunnel: TUNNEL_ID_PLACEHOLDER
-credentials-file: /root/.cloudflared/TUNNEL_ID_PLACEHOLDER.json
+  mkdir -p /root/.cloudflared
+  cat > /root/.cloudflared/config.yml <<EOF
+tunnel: ${tunnel_id}
+credentials-file: /root/.cloudflared/${cred_file}
 
 ingress:
-  - hostname: your.domain.com
+  - hostname: ${hostname}
     service: https://127.0.0.1:13245
     originRequest:
       noTLSVerify: true
   - service: http_status:404
 EOF
 
-cat > /etc/sing-box/config.json <<EOF
+  echo -e "\n✅ 配置文件已写入 /root/.cloudflared/config.yml"
+  read -p "按回车键返回菜单..."
+}
+
+set_node_config() {
+  echo "🛠 设置节点配置（vmess 和 hy2）"
+  read -p "请输入 vmess UUID: " uuid
+  read -p "请输入 hy2 密码: " hy2pass
+
+  mkdir -p /etc/sing-box
+  cat > /etc/sing-box/config.json <<EOF
 {
   "log": {
     "level": "info"
@@ -68,7 +70,7 @@ cat > /etc/sing-box/config.json <<EOF
       "tag": "vmess-in",
       "users": [
         {
-          "uuid": "11111111-1111-1111-1111-111111111111",
+          "uuid": "${uuid}",
           "alterId": 0
         }
       ],
@@ -84,7 +86,7 @@ cat > /etc/sing-box/config.json <<EOF
       "tag": "hy2-in",
       "users": [
         {
-          "password": "your_hy2_password"
+          "password": "${hy2pass}"
         }
       ]
     }
@@ -102,11 +104,19 @@ cat > /etc/sing-box/config.json <<EOF
 }
 EOF
 
-green "✅ 安装完成，请根据提示修改配置文件："
-yellow "/root/.cloudflared/config.yml"
-yellow "/etc/sing-box/config.json"
+  echo "✅ 节点配置已保存至 /etc/sing-box/config.json"
+  read -p "按回车键返回菜单..."
+}
 
-green "🚀 修改完成后你可以执行以下命令启动服务："
-echo "  systemctl daemon-reexec"
-echo "  systemctl enable --now cloudflared"
-echo "  systemctl enable --now sing-box"
+while true; do
+  show_menu
+  read -p "请输入选项 [0-4]: " choice
+  case $choice in
+    1) install_singbox ;;
+    2) uninstall_singbox ;;
+    3) set_fixed_tunnel ;;
+    4) set_node_config ;;
+    0) echo "退出菜单"; exit 0 ;;
+    *) echo "❌ 无效选项，请重新输入"; sleep 1 ;;
+  esac
+done
