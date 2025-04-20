@@ -1,7 +1,6 @@
 #!/bin/bash
 set -e
 
-# 输出颜色函数
 green() { echo -e "\033[32m\033[01m$1\033[0m"; }
 yellow() { echo -e "\033[33m\033[01m$1\033[0m"; }
 red() { echo -e "\033[31m\033[01m$1\033[0m"; }
@@ -22,9 +21,13 @@ green "系统架构为 $ARCH"
 
 green "[3/5] 下载并安装 sing-box..."
 SBOX_VERSION=$(curl -s https://api.github.com/repos/SagerNet/sing-box/releases/latest | jq -r .tag_name)
-wget -qO- https://github.com/SagerNet/sing-box/releases/download/${SBOX_VERSION}/sing-box-${SBOX_VERSION}-linux-${ARCH}.tar.gz | tar -xz
+SBOX_VERSION_CLEAN=$(echo "$SBOX_VERSION" | sed 's/^v//')
+
+wget -O sing-box.tar.gz https://github.com/SagerNet/sing-box/releases/download/${SBOX_VERSION}/sing-box-${SBOX_VERSION_CLEAN}-linux-${ARCH}.tar.gz
+tar -xzf sing-box.tar.gz || { red "❌ 解压失败，下载可能不完整或版本号不匹配"; exit 1; }
+
 mkdir -p /etc/sing-box
-mv sing-box-${SBOX_VERSION}-linux-${ARCH}/* /etc/sing-box/
+mv sing-box-${SBOX_VERSION_CLEAN}-linux-${ARCH}/* /etc/sing-box/
 ln -sf /etc/sing-box/sing-box /usr/local/bin/sing-box
 
 green "[4/5] 安装 Cloudflare Tunnel 工具..."
@@ -57,38 +60,46 @@ cat > /etc/sing-box/config.json <<EOF
   "log": {
     "level": "info"
   },
-  "inbounds": [],
-  "outbounds": []
+  "inbounds": [
+    {
+      "type": "vmess",
+      "listen": "0.0.0.0",
+      "listen_port": 10000,
+      "tag": "vmess-in",
+      "users": [
+        {
+          "uuid": "11111111-1111-1111-1111-111111111111",
+          "alterId": 0
+        }
+      ],
+      "transport": {
+        "type": "ws",
+        "path": "/ws"
+      }
+    },
+    {
+      "type": "hysteria2",
+      "listen": "0.0.0.0",
+      "listen_port": 10080,
+      "tag": "hy2-in",
+      "users": [
+        {
+          "password": "your_hy2_password"
+        }
+      ]
+    }
+  ],
+  "outbounds": [
+    {
+      "type": "direct",
+      "tag": "direct"
+    },
+    {
+      "type": "block",
+      "tag": "block"
+    }
+  ]
 }
-EOF
-
-cat > /etc/systemd/system/cloudflared.service <<EOF
-[Unit]
-Description=Cloudflare Tunnel
-After=network.target
-
-[Service]
-ExecStart=/usr/local/bin/cloudflared tunnel run
-Restart=on-failure
-User=root
-
-[Install]
-WantedBy=multi-user.target
-EOF
-
-cat > /etc/systemd/system/sing-box.service <<EOF
-[Unit]
-Description=Sing-box Service
-After=network.target
-
-[Service]
-ExecStart=/usr/local/bin/sing-box run -c /etc/sing-box/config.json
-Restart=always
-User=root
-LimitNOFILE=65535
-
-[Install]
-WantedBy=multi-user.target
 EOF
 
 green "✅ 安装完成，请根据提示修改配置文件："
@@ -99,4 +110,3 @@ green "🚀 修改完成后你可以执行以下命令启动服务："
 echo "  systemctl daemon-reexec"
 echo "  systemctl enable --now cloudflared"
 echo "  systemctl enable --now sing-box"
-
