@@ -1,202 +1,324 @@
 #!/bin/bash
+echo "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~" 
+echo "甬哥Github项目  ：github.com/yonggekkk"
+echo "甬哥Blogger博客 ：ygkkk.blogspot.com"
+echo "甬哥YouTube频道 ：www.youtube.com/@ygkkk"
+echo "ArgoSB真一键无交互脚本"
+echo "当前版本：25.4.22 测试beta2版"
+echo "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
+export LANG=en_US.UTF-8
+[[ $EUID -ne 0 ]] && yellow "请以root模式运行脚本" && exit
+if [[ -f /etc/redhat-release ]]; then
+release="Centos"
+elif cat /etc/issue | grep -q -E -i "alpine"; then
+release="alpine"
+elif cat /etc/issue | grep -q -E -i "debian"; then
+release="Debian"
+elif cat /etc/issue | grep -q -E -i "ubuntu"; then
+release="Ubuntu"
+elif cat /etc/issue | grep -q -E -i "centos|red hat|redhat"; then
+release="Centos"
+elif cat /proc/version | grep -q -E -i "debian"; then
+release="Debian"
+elif cat /proc/version | grep -q -E -i "ubuntu"; then
+release="Ubuntu"
+elif cat /proc/version | grep -q -E -i "centos|red hat|redhat"; then
+release="Centos"
+else 
+red "脚本不支持当前的系统，请选择使用Ubuntu,Debian,Centos系统。" && exit
+fi
+op=$(cat /etc/redhat-release 2>/dev/null || cat /etc/os-release 2>/dev/null | grep -i pretty_name | cut -d \" -f2)
+if [[ $(echo "$op" | grep -i -E "arch") ]]; then
+red "脚本不支持当前的 $op 系统，请选择使用Ubuntu,Debian,Centos系统。" && exit
+fi
+[[ -z $(systemd-detect-virt 2>/dev/null) ]] && vi=$(virt-what 2>/dev/null) || vi=$(systemd-detect-virt 2>/dev/null)
+case $(uname -m) in
+aarch64) cpu=arm64;;
+x86_64) cpu=amd64;;
+*) red "目前脚本不支持$(uname -m)架构" && exit;;
+esac
+hostname=$(hostname)
+export UUID=${uuid:-''}
+export port_vm_ws=${vmpt:-''}
+export ARGO_DOMAIN=${agn:-''}   
+export ARGO_AUTH=${agk:-''} 
 
-green() { echo -e "\033[32m\033[01m$1\033[0m"; }
-yellow() { echo -e "\033[33m\033[01m$1\033[0m"; }
-red() { echo -e "\033[31m\033[01m$1\033[0m"; }
-
-prompt_ip() {
-  echo
-  echo "请选择用于 vmess 节点展示的 IP 类型："
-  echo "1. 使用 IPv4"
-  echo "2. 使用 IPv6"
-  read -p "输入选项 [1-2]，默认 1: " ip_choice
-
-  if [[ "$ip_choice" == "2" ]]; then
-    VM_IP=$(curl -s --max-time 3 ipv6.ip.sb)
-  else
-    VM_IP=$(curl -s --max-time 3 ipv4.ip.sb)
-  fi
-
-  [[ -z "$VM_IP" ]] && VM_IP="your.server.ip"
-  echo "$VM_IP" > /etc/sing-box/vmess_ip.txt
+del(){
+if [[ -n $(ps -e | grep cloudflared) ]]; then
+kill -15 $(cat /etc/s-box-ag/sbargopid.log 2>/dev/null) >/dev/null 2>&1
+fi
+if [[ x"${release}" == x"alpine" ]]; then
+rc-service sing-box stop
+rc-update del sing-box default
+rm /etc/init.d/sing-box -f
+else
+systemctl stop sing-box >/dev/null 2>&1
+systemctl disable sing-box >/dev/null 2>&1
+rm -f /etc/systemd/system/sing-box.service
+fi
+crontab -l > /tmp/crontab.tmp
+sed -i '/sbargopid/d' /tmp/crontab.tmp
+crontab /tmp/crontab.tmp
+rm /tmp/crontab.tmp
+rm -rf /etc/s-box-ag
+echo "卸载完成" 
+exit
 }
 
-install_all() {
-  if [[ -f /etc/sing-box/config.json ]]; then
-    yellow "Sing-box 已安装，跳过安装。"
-    return
-  fi
+agn(){
+argoname=$(cat /etc/s-box-ag/sbargoym.log 2>/dev/null)
+if [ -z $argoname ]; then
+argodomain=$(cat /etc/s-box-ag/argo.log 2>/dev/null | grep -a trycloudflare.com | awk 'NR==2{print}' | awk -F// '{print $2}' | awk '{print $1}')
+if [ -z $argodomain ]; then
+echo "当前argo临时域名未生成，建议卸载重装" 
+else
+echo "当前argo最新临时域名：$argodomain"
+fi
+else
+echo "当前argo固定域名：$argoname"
+echo "当前argo固定域名token：$(cat /etc/s-box-ag/sbargotoken.log 2>/dev/null)"
+fi
+exit
+}
 
-  green "🔧 安装 Sing-box + Cloudflared 隧道..."
-  apt update -y && apt install -y curl wget jq tar socat iptables
+if [[ "$1" == "del" ]]; then
+del
+elif [[ "$1" == "agn" ]]; then
+agn
+fi
 
-  ARCH=$(uname -m)
-  [[ "$ARCH" == "x86_64" ]] && ARCH="amd64"
-  [[ "$ARCH" == "aarch64" ]] && ARCH="arm64"
+if [[ x"${release}" == x"alpine" ]]; then
+status_cmd="rc-service sing-box status"
+status_pattern="started"
+else
+status_cmd="systemctl status sing-box"
+status_pattern="active"
+fi
+if [[ -n $($status_cmd 2>/dev/null | grep -w "$status_pattern") && -f '/etc/s-box-ag/sb.json' ]]; then
+echo "ArgoSB脚本已在运行中" && exit
+elif [[ -z $($status_cmd 2>/dev/null | grep -w "$status_pattern") && -f '/etc/s-box-ag/sb.json' ]]; then
+echo "ArgoSB脚本已安装，但未启动，请卸载重装" && exit
+else
+echo "VPS系统：$op"
+echo "CPU架构：$cpu"
+echo "ArgoSB脚本未安装，开始安装…………" && sleep 3
+echo
+fi
 
-  VER=$(curl -s https://api.github.com/repos/SagerNet/sing-box/releases/latest | jq -r .tag_name)
-  CLEAN_VER=$(echo "$VER" | sed 's/^v//')
-  wget -O sb.tar.gz https://github.com/SagerNet/sing-box/releases/download/${VER}/sing-box-${CLEAN_VER}-linux-${ARCH}.tar.gz
-  tar -xzf sb.tar.gz
-  mkdir -p /etc/sing-box
-  mv sing-box-${CLEAN_VER}-linux-${ARCH}/* /etc/sing-box/
-  ln -sf /etc/sing-box/sing-box /usr/local/bin/sing-box
+if [[ x"${release}" == x"alpine" ]]; then
+apk update
+apk add wget curl tar jq tzdata openssl expect git socat iproute2 iptables grep dcron
+apk add virt-what
+else
+apt update -y
+apt install curl wget tar gzip cron -y
+fi
 
-  prompt_ip
+warpcheck(){
+wgcfv6=$(curl -s6m5 https://www.cloudflare.com/cdn-cgi/trace -k | grep warp | cut -d= -f2)
+wgcfv4=$(curl -s4m5 https://www.cloudflare.com/cdn-cgi/trace -k | grep warp | cut -d= -f2)
+}
+v4orv6(){
+if [ -z $(curl -s4m5 icanhazip.com -k) ]; then
+echo -e "nameserver 2a00:1098:2b::1\nnameserver 2a00:1098:2c::1\nnameserver 2a01:4f8:c2c:123f::1" > /etc/resolv.conf
+fi
+}
+warpcheck
+if [[ ! $wgcfv4 =~ on|plus && ! $wgcfv6 =~ on|plus ]]; then
+v4orv6
+else
+systemctl stop wg-quick@wgcf >/dev/null 2>&1
+kill -15 $(pgrep warp-go) >/dev/null 2>&1 && sleep 2
+v4orv6
+systemctl start wg-quick@wgcf >/dev/null 2>&1
+systemctl restart warp-go >/dev/null 2>&1
+systemctl enable warp-go >/dev/null 2>&1
+systemctl start warp-go >/dev/null 2>&1
+fi
+mkdir -p /etc/s-box-ag
+sbcore=$(curl -Ls https://data.jsdelivr.com/v1/package/gh/SagerNet/sing-box | grep -Eo '"[0-9.]+",' | sed -n 1p | tr -d '",')
+sbname="sing-box-$sbcore-linux-$cpu"
+echo "下载sing-box最新正式版内核：$sbcore"
+curl -L -o /etc/s-box-ag/sing-box.tar.gz  -# --retry 2 https://github.com/SagerNet/sing-box/releases/download/v$sbcore/$sbname.tar.gz
+if [[ -f '/etc/s-box-ag/sing-box.tar.gz' ]]; then
+tar xzf /etc/s-box-ag/sing-box.tar.gz -C /etc/s-box-ag
+mv /etc/s-box-ag/$sbname/sing-box /etc/s-box-ag
+rm -rf /etc/s-box-ag/{sing-box.tar.gz,$sbname}
+else
+echo "下载失败，请检测网络"
+fi
 
-  cat > /etc/sing-box/config.json <<EOF
+if [ -z $port_vm_ws ]; then
+port_vm_ws=$(shuf -i 10000-65535 -n 1)
+fi
+if [ -z $UUID ]; then
+UUID=$(/etc/s-box-ag/sing-box generate uuid)
+fi
+echo
+echo "当前vmess主协议端口：$port_vm_ws"
+echo
+echo "当前uuid密码：$UUID"
+echo
+sleep 3
+
+cat > /etc/s-box-ag/sb.json <<EOF
 {
-  "log": {
-    "level": "info"
+"log": {
+    "disabled": false,
+    "level": "info",
+    "timestamp": true
   },
   "inbounds": [
-    {
-      "type": "vmess",
-      "listen": "0.0.0.0",
-      "listen_port": 20702,
-      "tag": "vmess-in",
-      "users": [{ "uuid": "760affb8-8137-4a53-8ca9-4b2bb2befc54", "alterId": 0 }],
-      "transport": { "type": "ws", "path": "/ws" }
+{
+        "type": "vmess",
+        "tag": "vmess-sb",
+        "listen": "::",
+        "listen_port": ${port_vm_ws},
+        "users": [
+            {
+                "uuid": "${UUID}",
+                "alterId": 0
+            }
+        ],
+        "transport": {
+            "type": "ws",
+            "path": "${UUID}-vm",
+            "max_early_data":2048,
+            "early_data_header_name": "Sec-WebSocket-Protocol"    
+        },
+        "tls":{
+                "enabled": false,
+                "server_name": "www.bing.com",
+                "certificate_path": "/etc/s-box-ag/cert.pem",
+                "key_path": "/etc/s-box-ag/private.key"
+            }
     }
-  ],
-  "outbounds": [
-    { "type": "direct", "tag": "direct" },
-    { "type": "block", "tag": "block" }
-  ]
+    ],
+"outbounds": [
+{
+"type":"direct",
+"tag":"direct"
+}
+]
 }
 EOF
 
-  cat > /etc/systemd/system/sing-box.service <<EOF
+if [[ x"${release}" == x"alpine" ]]; then
+echo '#!/sbin/openrc-run
+description="sing-box service"
+command="/etc/s-box-ag/sing-box"
+command_args="run -c /etc/s-box-ag/sb.json"
+command_background=true
+pidfile="/var/run/sing-box.pid"' > /etc/init.d/sing-box
+chmod +x /etc/init.d/sing-box
+rc-update add sing-box default
+rc-service sing-box start
+else
+cat > /etc/systemd/system/sing-box.service <<EOF
 [Unit]
-Description=Sing-box Service
-After=network.target
-
+After=network.target nss-lookup.target
 [Service]
-ExecStart=/usr/local/bin/sing-box run -c /etc/sing-box/config.json
-Restart=always
 User=root
-
+WorkingDirectory=/root
+CapabilityBoundingSet=CAP_NET_ADMIN CAP_NET_BIND_SERVICE CAP_NET_RAW
+AmbientCapabilities=CAP_NET_ADMIN CAP_NET_BIND_SERVICE CAP_NET_RAW
+ExecStart=/etc/s-box-ag/sing-box run -c /etc/s-box-ag/sb.json
+ExecReload=/bin/kill -HUP \$MAINPID
+Restart=on-failure
+RestartSec=10
+LimitNOFILE=infinity
 [Install]
 WantedBy=multi-user.target
 EOF
+systemctl daemon-reload
+systemctl enable sing-box >/dev/null 2>&1
+systemctl start sing-box
+systemctl restart sing-box
+fi
+argocore=$(curl -Ls https://data.jsdelivr.com/v1/package/gh/cloudflare/cloudflared | grep -Eo '"[0-9.]+",' | sed -n 1p | tr -d '",')
+echo "下载cloudflared-argo最新正式版内核：$argocore"
+curl -L -o /etc/s-box-ag/cloudflared -# --retry 2 https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-$cpu
+chmod +x /etc/s-box-ag/cloudflared
+if [[ -n "${ARGO_DOMAIN}" && -n "${ARGO_AUTH}" ]]; then
+name='固定'
+/etc/s-box-ag/cloudflared tunnel --no-autoupdate --edge-ip-version auto --protocol http2 run --token ${ARGO_AUTH} >/dev/null 2>&1 & echo "$!" > /etc/s-box-ag/sbargopid.log
+echo ${ARGO_DOMAIN} > /etc/s-box-ag/sbargoym.log
+echo ${ARGO_AUTH} > /etc/s-box-ag/sbargotoken.log
+else
+name='临时'
+/etc/s-box-ag/cloudflared tunnel --url http://localhost:$(sed 's://.*::g' /etc/s-box-ag/sb.json | jq -r '.inbounds[0].listen_port') --edge-ip-version auto --no-autoupdate --protocol http2 > /etc/s-box-ag/argo.log 2>&1 &
+echo "$!" > /etc/s-box-ag/sbargopid.log
+fi
+echo "申请Argo$name隧道中……请稍等"
+sleep 8
+if [[ -n "${ARGO_DOMAIN}" && -n "${ARGO_AUTH}" ]]; then
+argodomain=$(cat /etc/s-box-ag/sbargoym.log 2>/dev/null)
+else
+argodomain=$(cat /etc/s-box-ag/argo.log 2>/dev/null | grep -a trycloudflare.com | awk 'NR==2{print}' | awk -F// '{print $2}' | awk '{print $1}')
+fi
+if [[ -n $argodomain ]]; then
+echo "Argo$name隧道申请成功，域名为：$argodomain"
+else
+echo "Argo$name隧道申请失败，请稍后再试" && exit
+fi
+crontab -l > /tmp/crontab.tmp
+sed -i '/sbargopid/d' /tmp/crontab.tmp
+if [[ -n "${ARGO_DOMAIN}" && -n "${ARGO_AUTH}" ]]; then
+echo '@reboot /bin/bash -c "/etc/s-box-ag/cloudflared tunnel --no-autoupdate --edge-ip-version auto --protocol http2 run --token $(cat /etc/s-box-ag/sbargotoken.log 2>/dev/null) >/dev/null 2>&1 & pid=\$! && echo \$pid > /etc/s-box-ag/sbargopid.log"' >> /tmp/crontab.tmp
+else
+echo '@reboot /bin/bash -c "/etc/s-box-ag/cloudflared tunnel --url http://localhost:$(sed 's://.*::g' /etc/s-box-ag/sb.json | jq -r '.inbounds[0].listen_port') --edge-ip-version auto --no-autoupdate --protocol http2 > /etc/s-box-ag/argo.log 2>&1 & pid=\$! && echo \$pid > /etc/s-box-ag/sbargopid.log"' >> /tmp/crontab.tmp
+fi
+crontab /tmp/crontab.tmp
+rm /tmp/crontab.tmp
 
-  systemctl daemon-reexec
-  systemctl enable --now sing-box
-
-  wget -O /usr/local/bin/cloudflared https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-${ARCH}
-  chmod +x /usr/local/bin/cloudflared
-
-  iptables -I INPUT -p tcp --dport 20702 -j ACCEPT
-  green "✅ 安装完成，端口 20702 已放行"
-}
-
-uninstall_all() {
-  systemctl stop sing-box
-  pkill -f cloudflared
-  systemctl disable sing-box
-  rm -rf /usr/local/bin/sing-box /usr/local/bin/cloudflared
-  rm -rf /etc/sing-box /root/.cloudflared
-  rm -f /etc/systemd/system/sing-box.service
-  systemctl daemon-reexec
-  green "✅ 已卸载 sing-box 与隧道"
-}
-
-view_node() {
-  VM_IP=$(cat /etc/sing-box/vmess_ip.txt 2>/dev/null || echo "your.server.ip")
-  port=$(jq -r '.inbounds[0].listen_port' /etc/sing-box/config.json)
-  uuid=$(jq -r '.inbounds[0].users[0].uuid' /etc/sing-box/config.json)
-  vmess_json='{"v":"2","ps":"MyNode","add":"'$VM_IP'","port":"'$port'","id":"'$uuid'","aid":"0","net":"ws","type":"none","host":"","path":"/ws","tls":""}'
-  vmess_b64=$(echo -n "$vmess_json" | base64 -w0)
-  echo
-  green "【完整 Vmess 节点信息】"
-  echo "地址: $VM_IP"
-  echo "端口: $port"
-  echo "UUID : $uuid"
-  echo "路径: /ws"
-  echo "协议: vmess + ws"
-  echo "一键链接:"
-  echo "vmess://$vmess_b64"
-}
-
-modify_vmess() {
-  read -p "请输入新的端口号: " newport
-  read -p "是否生成新 UUID？(y/n): " confirm
-  if [[ "$confirm" == "y" ]]; then
-    newid=$(uuidgen)
-  else
-    read -p "请输入新 UUID: " newid
-  fi
-  jq ".inbounds[0].listen_port=$newport | .inbounds[0].users[0].uuid=\"$newid\"" /etc/sing-box/config.json > /tmp/tmp.json && mv /tmp/tmp.json /etc/sing-box/config.json
-  iptables -I INPUT -p tcp --dport $newport -j ACCEPT
-  systemctl restart sing-box
-  green "✅ 已更新端口 $newport，UUID $newid"
-}
-
-set_tunnel() {
-  read -p "请输入 Tunnel ID: " tid
-  read -p "请输入 credentials.json 文件名: " cred
-  read -p "请输入绑定域名 hostname: " host
-
-  mkdir -p /root/.cloudflared
-  cat > /root/.cloudflared/config.yml <<EOF
-tunnel: $tid
-credentials-file: /root/.cloudflared/$cred
-
-ingress:
-  - hostname: $host
-    service: https://127.0.0.1:20702
-    originRequest:
-      noTLSVerify: true
-  - service: http_status:404
-EOF
-  echo "✅ 隧道配置已写入 /root/.cloudflared/config.yml"
-}
-
-# 状态展示
-show_status() {
-  systemctl is-active --quiet sing-box && sb="✅" || sb="❌"
-  pgrep cloudflared >/dev/null && cf="✅" || cf="❌"
-  VM_IP=$(cat /etc/sing-box/vmess_ip.txt 2>/dev/null || echo "your.server.ip")
-  uuid=$(jq -r '.inbounds[0].users[0].uuid' /etc/sing-box/config.json 2>/dev/null)
-  port=$(jq -r '.inbounds[0].listen_port' /etc/sing-box/config.json 2>/dev/null)
-  domain=$(grep -m1 'hostname:' /root/.cloudflared/config.yml 2>/dev/null | awk '{print $2}')
-  [[ -z "$domain" ]] && domain="未配置"
-  ip4=$(curl -s --max-time 2 ipv4.ip.sb || echo "无")
-  ip6=$(curl -s --max-time 2 ipv6.ip.sb || echo "无")
-  sys=$(uname -o) && arch=$(uname -m) && kern=$(uname -r)
-  up=$(uptime -p | sed 's/up //')
-
-  echo -e "\033[36m========================================================\033[0m"
-  echo "系统: $sys $arch | 内核: $kern"
-  echo "运行时长: $up"
-  echo "IPv4: $ip4"
-  echo "IPv6: $ip6"
-  echo "sing-box: $sb | cloudflared: $cf"
-  echo "UUID: $uuid"
-  echo "端口: $port | 路径: /ws"
-  echo "隧道域名: $domain"
-  echo -e "\033[36m========================================================\033[0m"
-}
-
-# 主菜单
-while true; do
-  clear
-  echo -e "\033[36m==================== sb_v7 完整正式版 ====================\033[0m"
-  echo "1. 安装 sing-box + 隧道"
-  echo "2. 卸载 sing-box 与隧道"
-  echo "3. 查看 vmess 节点信息"
-  echo "4. 修改端口与 UUID"
-  echo "5. 设置固定隧道（Tunnel ID + 域名）"
-  echo "6. 退出"
-  show_status
-  read -p "请输入选项 [1-6]: " opt
-  case "$opt" in
-    1) install_all ;;
-    2) uninstall_all ;;
-    3) view_node; read -p "按回车返回菜单..." ;;
-    4) modify_vmess; read -p "按回车返回菜单..." ;;
-    5) set_tunnel; read -p "按回车返回菜单..." ;;
-    6) break ;;
-    *) echo "❌ 无效选项"; sleep 1 ;;
-  esac
-done
+vmatls_link1="vmess://$(echo "{ \"v\": \"2\", \"ps\": \"vmess-ws-tls-argo-$hostname-443\", \"add\": \"104.16.0.0\", \"port\": \"443\", \"id\": \"$UUID\", \"aid\": \"0\", \"scy\": \"auto\", \"net\": \"ws\", \"type\": \"none\", \"host\": \"$argodomain\", \"path\": \"/$UUID-vm?ed=2048\", \"tls\": \"tls\", \"sni\": \"$argodomain\", \"alpn\": \"\", \"fp\": \"\"}" | base64 -w0)"
+echo "$vmatls_link1" > /etc/s-box-ag/jh.txt
+vmatls_link2="vmess://$(echo "{ \"v\": \"2\", \"ps\": \"vmess-ws-tls-argo-$hostname-8443\", \"add\": \"104.17.0.0\", \"port\": \"8443\", \"id\": \"$UUID\", \"aid\": \"0\", \"scy\": \"auto\", \"net\": \"ws\", \"type\": \"none\", \"host\": \"$argodomain\", \"path\": \"/$UUID-vm?ed=2048\", \"tls\": \"tls\", \"sni\": \"$argodomain\", \"alpn\": \"\", \"fp\": \"\"}" | base64 -w0)"
+echo "$vmatls_link2" >> /etc/s-box-ag/jh.txt
+vmatls_link3="vmess://$(echo "{ \"v\": \"2\", \"ps\": \"vmess-ws-tls-argo-$hostname-2053\", \"add\": \"104.18.0.0\", \"port\": \"2053\", \"id\": \"$UUID\", \"aid\": \"0\", \"scy\": \"auto\", \"net\": \"ws\", \"type\": \"none\", \"host\": \"$argodomain\", \"path\": \"/$UUID-vm?ed=2048\", \"tls\": \"tls\", \"sni\": \"$argodomain\", \"alpn\": \"\", \"fp\": \"\"}" | base64 -w0)"
+echo "$vmatls_link3" >> /etc/s-box-ag/jh.txt
+vmatls_link4="vmess://$(echo "{ \"v\": \"2\", \"ps\": \"vmess-ws-tls-argo-$hostname-2083\", \"add\": \"104.19.0.0\", \"port\": \"2083\", \"id\": \"$UUID\", \"aid\": \"0\", \"scy\": \"auto\", \"net\": \"ws\", \"type\": \"none\", \"host\": \"$argodomain\", \"path\": \"/$UUID-vm?ed=2048\", \"tls\": \"tls\", \"sni\": \"$argodomain\", \"alpn\": \"\", \"fp\": \"\"}" | base64 -w0)"
+echo "$vmatls_link4" >> /etc/s-box-ag/jh.txt
+vmatls_link5="vmess://$(echo "{ \"v\": \"2\", \"ps\": \"vmess-ws-tls-argo-$hostname-2087\", \"add\": \"104.20.0.0\", \"port\": \"2087\", \"id\": \"$UUID\", \"aid\": \"0\", \"scy\": \"auto\", \"net\": \"ws\", \"type\": \"none\", \"host\": \"$argodomain\", \"path\": \"/$UUID-vm?ed=2048\", \"tls\": \"tls\", \"sni\": \"$argodomain\", \"alpn\": \"\", \"fp\": \"\"}" | base64 -w0)"
+echo "$vmatls_link5" >> /etc/s-box-ag/jh.txt
+vmatls_link6="vmess://$(echo "{ \"v\": \"2\", \"ps\": \"vmess-ws-tls-argo-$hostname-2096\", \"add\": \"[2606:4700::]\", \"port\": \"2096\", \"id\": \"$UUID\", \"aid\": \"0\", \"scy\": \"auto\", \"net\": \"ws\", \"type\": \"none\", \"host\": \"$argodomain\", \"path\": \"/$UUID-vm?ed=2048\", \"tls\": \"tls\", \"sni\": \"$argodomain\", \"alpn\": \"\", \"fp\": \"\"}" | base64 -w0)"
+echo "$vmatls_link6" >> /etc/s-box-ag/jh.txt
+vma_link7="vmess://$(echo "{ \"v\": \"2\", \"ps\": \"vmess-ws-argo-$hostname-80\", \"add\": \"104.21.0.0\", \"port\": \"80\", \"id\": \"$UUID\", \"aid\": \"0\", \"scy\": \"auto\", \"net\": \"ws\", \"type\": \"none\", \"host\": \"$argodomain\", \"path\": \"/$UUID-vm?ed=2048\", \"tls\": \"\"}" | base64 -w0)"
+echo "$vma_link7" >> /etc/s-box-ag/jh.txt
+vma_link8="vmess://$(echo "{ \"v\": \"2\", \"ps\": \"vmess-ws-argo-$hostname-8080\", \"add\": \"104.22.0.0\", \"port\": \"8080\", \"id\": \"$UUID\", \"aid\": \"0\", \"scy\": \"auto\", \"net\": \"ws\", \"type\": \"none\", \"host\": \"$argodomain\", \"path\": \"/$UUID-vm?ed=2048\", \"tls\": \"\"}" | base64 -w0)"
+echo "$vma_link8" >> /etc/s-box-ag/jh.txt
+vma_link9="vmess://$(echo "{ \"v\": \"2\", \"ps\": \"vmess-ws-argo-$hostname-8880\", \"add\": \"104.24.0.0\", \"port\": \"8880\", \"id\": \"$UUID\", \"aid\": \"0\", \"scy\": \"auto\", \"net\": \"ws\", \"type\": \"none\", \"host\": \"$argodomain\", \"path\": \"/$UUID-vm?ed=2048\", \"tls\": \"\"}" | base64 -w0)"
+echo "$vma_link9" >> /etc/s-box-ag/jh.txt
+vma_link10="vmess://$(echo "{ \"v\": \"2\", \"ps\": \"vmess-ws-argo-$hostname-2052\", \"add\": \"104.25.0.0\", \"port\": \"2052\", \"id\": \"$UUID\", \"aid\": \"0\", \"scy\": \"auto\", \"net\": \"ws\", \"type\": \"none\", \"host\": \"$argodomain\", \"path\": \"/$UUID-vm?ed=2048\", \"tls\": \"\"}" | base64 -w0)"
+echo "$vma_link10" >> /etc/s-box-ag/jh.txt
+vma_link11="vmess://$(echo "{ \"v\": \"2\", \"ps\": \"vmess-ws-argo-$hostname-2082\", \"add\": \"104.26.0.0\", \"port\": \"2082\", \"id\": \"$UUID\", \"aid\": \"0\", \"scy\": \"auto\", \"net\": \"ws\", \"type\": \"none\", \"host\": \"$argodomain\", \"path\": \"/$UUID-vm?ed=2048\", \"tls\": \"\"}" | base64 -w0)"
+echo "$vma_link11" >> /etc/s-box-ag/jh.txt
+vma_link12="vmess://$(echo "{ \"v\": \"2\", \"ps\": \"vmess-ws-argo-$hostname-2086\", \"add\": \"104.27.0.0\", \"port\": \"2086\", \"id\": \"$UUID\", \"aid\": \"0\", \"scy\": \"auto\", \"net\": \"ws\", \"type\": \"none\", \"host\": \"$argodomain\", \"path\": \"/$UUID-vm?ed=2048\", \"tls\": \"\"}" | base64 -w0)"
+echo "$vma_link12" >> /etc/s-box-ag/jh.txt
+vma_link13="vmess://$(echo "{ \"v\": \"2\", \"ps\": \"vmess-ws-argo-$hostname-2095\", \"add\": \"[2400:cb00:2049::]\", \"port\": \"2095\", \"id\": \"$UUID\", \"aid\": \"0\", \"scy\": \"auto\", \"net\": \"ws\", \"type\": \"none\", \"host\": \"$argodomain\", \"path\": \"/$UUID-vm?ed=2048\", \"tls\": \"\"}" | base64 -w0)"
+echo "$vma_link13" >> /etc/s-box-ag/jh.txt
+baseurl=$(base64 -w 0 < /etc/s-box-ag/jh.txt)
+echo "ArgoSB脚本安装完毕"
+echo "---------------------------------------------------------"
+echo "---------------------------------------------------------"
+echo "输出配置信息" && sleep 3
+echo
+echo "443端口的vmess-ws-tls-argo节点，默认优选IPV4：104.16.0.0"
+sed -n '1p' /etc/s-box-ag/jh.txt
+echo
+echo "2096端口的vmess-ws-tls-argo节点，默认优选IPV6：[2606:4700::]（本地网络支持IPV6才可用）"
+sed -n '6p' /etc/s-box-ag/jh.txt
+echo
+echo "80端口的vmess-ws-argo节点，默认优选IPV4：104.21.0.0"
+sed -n '7p' /etc/s-box-ag/jh.txt
+echo
+echo "2095端口的vmess-ws-argo节点，默认优选IPV6：[2400:cb00:2049::]（本地网络支持IPV6才可用）"
+sed -n '13p' /etc/s-box-ag/jh.txt
+echo
+echo "---------------------------------------------------------"
+echo "聚合分享Argo节点13个端口及不死IP全覆盖：7个关tls 80系端口节点、6个开tls 443系端口节点" && sleep 3
+echo
+echo $baseurl
+echo
+echo "---------------------------------------------------------"
+echo
