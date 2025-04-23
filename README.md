@@ -1,6 +1,6 @@
-、、、
-### ArgoSB真一键无交互脚本：最新sing-box内核+最新Cloudflared-Argo内核
-、、、
+
+#### ArgoSB真一键无交互脚本：最新sing-box内核+最新Cloudflared-Argo内核
+
 #### 支持Argo临时隧道、固定隧道，为Google IDX VPS专门设计，其他VPS也可安装
 
 #### 脚本仅VMESS协议，输出13个端口节点及对应的优选不死IP全覆盖（80系无TLS+443系开TLS，两个IPV6）
