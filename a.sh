@@ -4,7 +4,7 @@ echo "甬哥Github项目  ：github.com/yonggekkk"
 echo "甬哥Blogger博客 ：ygkkk.blogspot.com"
 echo "甬哥YouTube频道 ：www.youtube.com/@ygkkk"
 echo "ArgoSB真一键无交互脚本"
-echo "当前版本：25.4.22 测试beta2版"
+echo "当前版本：25.4.26 测试beta4版"
 echo "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
 export LANG=en_US.UTF-8
 [[ $EUID -ne 0 ]] && yellow "请以root模式运行脚本" && exit
@@ -60,31 +60,21 @@ crontab -l > /tmp/crontab.tmp
 sed -i '/sbargopid/d' /tmp/crontab.tmp
 crontab /tmp/crontab.tmp
 rm /tmp/crontab.tmp
-rm -rf /etc/s-box-ag
+rm -rf /etc/s-box-ag /usr/bin/agsb
+}
+up(){
+rm -rf /usr/bin/agsb
+curl -L -o /usr/bin/agsb -# --retry 2 --insecure https://raw.githubusercontent.com/yonggekkk/argosb/main/argosb.sh
+chmod +x /usr/bin/agsb
+}
+if [[ "$1" == "del" ]]; then
+del && sleep 2
 echo "卸载完成" 
 exit
-}
-
-agn(){
-argoname=$(cat /etc/s-box-ag/sbargoym.log 2>/dev/null)
-if [ -z $argoname ]; then
-argodomain=$(cat /etc/s-box-ag/argo.log 2>/dev/null | grep -a trycloudflare.com | awk 'NR==2{print}' | awk -F// '{print $2}' | awk '{print $1}')
-if [ -z $argodomain ]; then
-echo "当前argo临时域名未生成，建议卸载重装" 
-else
-echo "当前argo最新临时域名：$argodomain"
-fi
-else
-echo "当前argo固定域名：$argoname"
-echo "当前argo固定域名token：$(cat /etc/s-box-ag/sbargotoken.log 2>/dev/null)"
-fi
+elif [[ "$1" == "up" ]]; then
+up && sleep 2
+echo "升级完成" 
 exit
-}
-
-if [[ "$1" == "del" ]]; then
-del
-elif [[ "$1" == "agn" ]]; then
-agn
 fi
 
 if [[ x"${release}" == x"alpine" ]]; then
@@ -94,24 +84,44 @@ else
 status_cmd="systemctl status sing-box"
 status_pattern="active"
 fi
-if [[ -n $($status_cmd 2>/dev/null | grep -w "$status_pattern") && -f '/etc/s-box-ag/sb.json' ]]; then
-echo "ArgoSB脚本已在运行中" && exit
-elif [[ -z $($status_cmd 2>/dev/null | grep -w "$status_pattern") && -f '/etc/s-box-ag/sb.json' ]]; then
-echo "ArgoSB脚本已安装，但未启动，请卸载重装" && exit
+if [[ -n $($status_cmd 2>/dev/null | grep -w "$status_pattern") ]] && [[ -n $(ps -e | grep cloudflared) ]] && [[ -e /etc/s-box-ag/list.txt ]]; then
+echo "ArgoSB脚本已在运行中"
+argoname=$(cat /etc/s-box-ag/sbargoym.log 2>/dev/null)
+if [ -z $argoname ]; then
+argodomain=$(cat /etc/s-box-ag/argo.log 2>/dev/null | grep -a trycloudflare.com | awk 'NR==2{print}' | awk -F// '{print $2}' | awk '{print $1}')
+if [ -z $argodomain ]; then
+echo "当前argo临时域名未生成，请先将脚本卸载(agsb del)，再重新安装ArgoSB脚本" 
 else
+echo "当前argo最新临时域名：$argodomain"
+cat /etc/s-box-ag/list.txt
+fi
+else
+echo "当前argo固定域名：$argoname"
+echo "当前argo固定域名token：$(cat /etc/s-box-ag/sbargotoken.log 2>/dev/null)"
+cat /etc/s-box-ag/list.txt
+fi
+exit
+elif [[ -z $($status_cmd 2>/dev/null | grep -w "$status_pattern") ]] && [[ -z $(ps -e | grep cloudflared) ]]; then
 echo "VPS系统：$op"
 echo "CPU架构：$cpu"
 echo "ArgoSB脚本未安装，开始安装…………" && sleep 3
 echo
+else
+echo "ArgoSB脚本未启动，请先将脚本卸载(agsb del)，再重新安装ArgoSB脚本"
+exit
 fi
 
-if [[ x"${release}" == x"alpine" ]]; then
-apk update
-apk add wget curl tar jq tzdata openssl expect git socat iproute2 iptables grep dcron
-apk add virt-what
-else
+if command -v apt &> /dev/null; then
 apt update -y
-apt install curl wget tar gzip cron -y
+apt install curl wget tar gzip cron jq -y
+elif command -v yum &> /dev/null; then
+yum install -y curl wget jq tar
+elif command -v apk &> /dev/null; then
+apk update -y
+apk add wget curl tar jq tzdata openssl git grep dcron
+else
+echo "不支持当前系统，请手动安装依赖。"
+exit
 fi
 
 warpcheck(){
@@ -259,7 +269,7 @@ fi
 if [[ -n $argodomain ]]; then
 echo "Argo$name隧道申请成功，域名为：$argodomain"
 else
-echo "Argo$name隧道申请失败，请稍后再试" && exit
+echo "Argo$name隧道申请失败，请稍后再试" && del && exit
 fi
 crontab -l > /tmp/crontab.tmp
 sed -i '/sbargopid/d' /tmp/crontab.tmp
@@ -270,7 +280,7 @@ echo '@reboot /bin/bash -c "/etc/s-box-ag/cloudflared tunnel --url http://localh
 fi
 crontab /tmp/crontab.tmp
 rm /tmp/crontab.tmp
-
+up
 vmatls_link1="vmess://$(echo "{ \"v\": \"2\", \"ps\": \"vmess-ws-tls-argo-$hostname-443\", \"add\": \"104.16.0.0\", \"port\": \"443\", \"id\": \"$UUID\", \"aid\": \"0\", \"scy\": \"auto\", \"net\": \"ws\", \"type\": \"none\", \"host\": \"$argodomain\", \"path\": \"/$UUID-vm?ed=2048\", \"tls\": \"tls\", \"sni\": \"$argodomain\", \"alpn\": \"\", \"fp\": \"\"}" | base64 -w0)"
 echo "$vmatls_link1" > /etc/s-box-ag/jh.txt
 vmatls_link2="vmess://$(echo "{ \"v\": \"2\", \"ps\": \"vmess-ws-tls-argo-$hostname-8443\", \"add\": \"104.17.0.0\", \"port\": \"8443\", \"id\": \"$UUID\", \"aid\": \"0\", \"scy\": \"auto\", \"net\": \"ws\", \"type\": \"none\", \"host\": \"$argodomain\", \"path\": \"/$UUID-vm?ed=2048\", \"tls\": \"tls\", \"sni\": \"$argodomain\", \"alpn\": \"\", \"fp\": \"\"}" | base64 -w0)"
@@ -298,27 +308,37 @@ echo "$vma_link12" >> /etc/s-box-ag/jh.txt
 vma_link13="vmess://$(echo "{ \"v\": \"2\", \"ps\": \"vmess-ws-argo-$hostname-2095\", \"add\": \"[2400:cb00:2049::]\", \"port\": \"2095\", \"id\": \"$UUID\", \"aid\": \"0\", \"scy\": \"auto\", \"net\": \"ws\", \"type\": \"none\", \"host\": \"$argodomain\", \"path\": \"/$UUID-vm?ed=2048\", \"tls\": \"\"}" | base64 -w0)"
 echo "$vma_link13" >> /etc/s-box-ag/jh.txt
 baseurl=$(base64 -w 0 < /etc/s-box-ag/jh.txt)
-echo "ArgoSB脚本安装完毕"
-echo "---------------------------------------------------------"
-echo "---------------------------------------------------------"
-echo "输出配置信息" && sleep 3
-echo
-echo "443端口的vmess-ws-tls-argo节点，默认优选IPV4：104.16.0.0"
-sed -n '1p' /etc/s-box-ag/jh.txt
-echo
-echo "2096端口的vmess-ws-tls-argo节点，默认优选IPV6：[2606:4700::]（本地网络支持IPV6才可用）"
-sed -n '6p' /etc/s-box-ag/jh.txt
-echo
-echo "80端口的vmess-ws-argo节点，默认优选IPV4：104.21.0.0"
-sed -n '7p' /etc/s-box-ag/jh.txt
-echo
-echo "2095端口的vmess-ws-argo节点，默认优选IPV6：[2400:cb00:2049::]（本地网络支持IPV6才可用）"
-sed -n '13p' /etc/s-box-ag/jh.txt
-echo
-echo "---------------------------------------------------------"
-echo "聚合分享Argo节点13个端口及不死IP全覆盖：7个关tls 80系端口节点、6个开tls 443系端口节点" && sleep 3
-echo
-echo $baseurl
-echo
-echo "---------------------------------------------------------"
-echo
+line1=$(sed -n '1p' /etc/s-box-ag/jh.txt)
+line6=$(sed -n '6p' /etc/s-box-ag/jh.txt)
+line7=$(sed -n '7p' /etc/s-box-ag/jh.txt)
+line13=$(sed -n '13p' /etc/s-box-ag/jh.txt)
+echo "ArgoSB脚本安装完毕" && sleep 2
+cat > /etc/s-box-ag/list.txt <<EOF
+---------------------------------------------------------
+---------------------------------------------------------
+单节点配置输出：
+1、443端口的vmess-ws-tls-argo节点，默认优选IPV4：104.16.0.0
+$line1
+
+2、2096端口的vmess-ws-tls-argo节点，默认优选IPV6：[2606:4700::]（本地网络支持IPV6才可用）
+$line6
+
+3、80端口的vmess-ws-argo节点，默认优选IPV4：104.21.0.0
+$line7
+
+4、2095端口的vmess-ws-argo节点，默认优选IPV6：[2400:cb00:2049::]（本地网络支持IPV6才可用）
+$line13
+
+---------------------------------------------------------
+聚合节点配置输出：
+5、Argo节点13个端口及不死IP全覆盖：7个关tls 80系端口节点、6个开tls 443系端口节点
+
+$baseurl
+
+相关快捷方式如下：
+显示域名及节点信息：agsb
+升级脚本：agsb up
+卸载脚本：agsb del
+---------------------------------------------------------
+EOF
+cat /etc/s-box-ag/list.txt
