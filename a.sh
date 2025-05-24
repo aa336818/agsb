@@ -341,7 +341,7 @@ $line7
 升级脚本：agsb up
 卸载脚本：agsb del
 bash <(wget -qO- https://raw.githubusercontent.com/aa336818/agsb/main/a.sh)
-echo "agsb SB+CF隧道脚本"
+agsb SB+CF隧道脚本
 ---------------------------------------------------------
 EOF
 cat /etc/s-box-ag/list.txt
