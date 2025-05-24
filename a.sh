@@ -1,6 +1,6 @@
 #!/bin/bash
 echo "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~" 
-echo "agsbSB真一键无交互脚本"
+echo "agsb SB+CF隧道脚本"
 echo "https://raw.githubusercontent.com/aa336818/agsb/main/a.sh"
 echo "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
 export LANG=en_US.UTF-8
@@ -69,6 +69,7 @@ del && sleep 2
 echo "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~" 
 echo "卸载完成" 
 echo "https://raw.githubusercontent.com/aa336818/agsb/main/a.sh"
+echo "agsb SB+CF隧道脚本"
 echo "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~" 
 exit
 elif [[ "$1" == "up" ]]; then
@@ -76,6 +77,7 @@ up && sleep 2
 echo "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~" 
 echo "升级完成" 
 echo "https://raw.githubusercontent.com/aa336818/agsb/main/a.sh"
+echo "agsb SB+CF隧道脚本"
 echo "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~" 
 exit
 fi
@@ -96,6 +98,7 @@ if [ -z $argodomain ]; then
 echo "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~" 
 echo "当前argo临时域名未生成，请先将脚本卸载(agsb del)，再重新安装ArgoSB脚本"
 echo "https://raw.githubusercontent.com/aa336818/agsb/main/a.sh"
+echo "agsb SB+CF隧道脚本"
 echo "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~" 
 else
 echo "当前argo最新临时域名：$argodomain"
@@ -113,8 +116,11 @@ echo "CPU架构：$cpu"
 echo "ArgoSB脚本未安装，开始安装…………" && sleep 3
 echo
 else
+echo "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
 echo "ArgoSB脚本未启动，请先将脚本卸载(agsb del)，再重新安装ArgoSB脚本"
 echo "https://raw.githubusercontent.com/aa336818/agsb/main/a.sh"
+echo "agsb SB+CF隧道脚本"
+echo "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
 exit
 fi
 
@@ -335,6 +341,7 @@ $line7
 升级脚本：agsb up
 卸载脚本：agsb del
 https://raw.githubusercontent.com/aa336818/agsb/main/a.sh
+echo "agsb SB+CF隧道脚本"
 ---------------------------------------------------------
 EOF
 cat /etc/s-box-ag/list.txt
