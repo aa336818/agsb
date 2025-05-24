@@ -1,7 +1,7 @@
 #!/bin/bash
 echo "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~" 
 echo "agsb SB+CF隧道脚本"
-echo "https://raw.githubusercontent.com/aa336818/agsb/main/a.sh"
+echo "bash <(wget -qO- https://raw.githubusercontent.com/aa336818/agsb/main/a.sh)"
 echo "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
 export LANG=en_US.UTF-8
 [[ $EUID -ne 0 ]] && yellow "请以root模式运行脚本" && exit
@@ -68,7 +68,7 @@ if [[ "$1" == "del" ]]; then
 del && sleep 2
 echo "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~" 
 echo "卸载完成" 
-echo "https://raw.githubusercontent.com/aa336818/agsb/main/a.sh"
+echo "bash <(wget -qO- https://raw.githubusercontent.com/aa336818/agsb/main/a.sh)"
 echo "agsb SB+CF隧道脚本"
 echo "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~" 
 exit
@@ -76,7 +76,7 @@ elif [[ "$1" == "up" ]]; then
 up && sleep 2
 echo "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~" 
 echo "升级完成" 
-echo "https://raw.githubusercontent.com/aa336818/agsb/main/a.sh"
+echo "bash <(wget -qO- https://raw.githubusercontent.com/aa336818/agsb/main/a.sh)"
 echo "agsb SB+CF隧道脚本"
 echo "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~" 
 exit
@@ -97,7 +97,7 @@ argodomain=$(cat /etc/s-box-ag/argo.log 2>/dev/null | grep -a trycloudflare.com 
 if [ -z $argodomain ]; then
 echo "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~" 
 echo "当前argo临时域名未生成，请先将脚本卸载(agsb del)，再重新安装ArgoSB脚本"
-echo "https://raw.githubusercontent.com/aa336818/agsb/main/a.sh"
+echo "bash <(wget -qO- https://raw.githubusercontent.com/aa336818/agsb/main/a.sh)"
 echo "agsb SB+CF隧道脚本"
 echo "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~" 
 else
@@ -118,7 +118,7 @@ echo
 else
 echo "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
 echo "ArgoSB脚本未启动，请先将脚本卸载(agsb del)，再重新安装ArgoSB脚本"
-echo "https://raw.githubusercontent.com/aa336818/agsb/main/a.sh"
+echo "bash <(wget -qO- https://raw.githubusercontent.com/aa336818/agsb/main/a.sh)"
 echo "agsb SB+CF隧道脚本"
 echo "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
 exit
@@ -340,7 +340,7 @@ $line7
 显示域名及节点信息：agsb
 升级脚本：agsb up
 卸载脚本：agsb del
-https://raw.githubusercontent.com/aa336818/agsb/main/a.sh
+bash <(wget -qO- https://raw.githubusercontent.com/aa336818/agsb/main/a.sh)
 echo "agsb SB+CF隧道脚本"
 ---------------------------------------------------------
 EOF
