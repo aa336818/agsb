@@ -1,6 +1,7 @@
 #!/bin/bash
 echo "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~" 
-echo "ArgoSB真一键无交互脚本"
+echo "agsbSB真一键无交互脚本"
+echo "https://raw.githubusercontent.com/aa336818/agsb/main/a.sh"
 echo "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
 export LANG=en_US.UTF-8
 [[ $EUID -ne 0 ]] && yellow "请以root模式运行脚本" && exit
@@ -65,11 +66,17 @@ chmod +x /usr/bin/agsb
 }
 if [[ "$1" == "del" ]]; then
 del && sleep 2
+echo "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~" 
 echo "卸载完成" 
+echo "https://raw.githubusercontent.com/aa336818/agsb/main/a.sh"
+echo "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~" 
 exit
 elif [[ "$1" == "up" ]]; then
 up && sleep 2
+echo "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~" 
 echo "升级完成" 
+echo "https://raw.githubusercontent.com/aa336818/agsb/main/a.sh"
+echo "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~" 
 exit
 fi
 
@@ -86,7 +93,10 @@ argoname=$(cat /etc/s-box-ag/sbargoym.log 2>/dev/null)
 if [ -z $argoname ]; then
 argodomain=$(cat /etc/s-box-ag/argo.log 2>/dev/null | grep -a trycloudflare.com | awk 'NR==2{print}' | awk -F// '{print $2}' | awk '{print $1}')
 if [ -z $argodomain ]; then
-echo "当前argo临时域名未生成，请先将脚本卸载(agsb del)，再重新安装ArgoSB脚本" 
+echo "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~" 
+echo "当前argo临时域名未生成，请先将脚本卸载(agsb del)，再重新安装ArgoSB脚本"
+echo "https://raw.githubusercontent.com/aa336818/agsb/main/a.sh"
+echo "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~" 
 else
 echo "当前argo最新临时域名：$argodomain"
 cat /etc/s-box-ag/list.txt
@@ -324,6 +334,7 @@ $line7
 显示域名及节点信息：agsb
 升级脚本：agsb up
 卸载脚本：agsb del
+https://raw.githubusercontent.com/aa336818/agsb/main/a.sh
 ---------------------------------------------------------
 EOF
 cat /etc/s-box-ag/list.txt
